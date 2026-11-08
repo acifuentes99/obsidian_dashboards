@@ -45,6 +45,7 @@ fi
 MAPPINGS=(
     "C. Dashboards/|C. Dashboards/"
     "datacore/|Z. Meta/datacore/"
+    "quickadd-scripts/|Z. Meta/js-scripts/"
 )
 
 echo "Repo:  $REPO_ROOT"
