@@ -11,6 +11,7 @@ cssclasses:
 
 ```datacorejsx
 const CreationTimeline = await dc.require("Z. Meta/datacore/creationTimeline.jsx");
+const { buildResourceTree, filterResourceTree } = await dc.require("Z. Meta/datacore/utils/resourceTree.js");
 
 const getTimestamp = (row) => {
     const v = row.$frontmatter?.timestamp?.value;
@@ -28,12 +29,6 @@ return function View() {
         '@page and #type/resource and !path("T. Templates")',
         { debounce: 2500 }
     );
-
-    const resourcePathSet = dc.useMemo(() => {
-        const s = new Set();
-        allResources.forEach(p => s.add(p.$path));
-        return s;
-    }, [allResources]);
 
     const resources = dc.useMemo(() => {
         return allResources.map(page => {
@@ -65,73 +60,14 @@ return function View() {
             .slice(0, 20);
     }, [resources]);
 
-    const { finalGraph, categoryGroups } = dc.useMemo(() => {
-        // parentByChild[name] = names of resources that link TO this resource
-        const parentByChild = {};
-        resources.forEach(r => { parentByChild[r.name] = []; });
-
-        resources.forEach(r => {
-            r.outlinks.forEach(link => {
-                if (!resourcePathSet.has(link.path)) return;
-                const targetName = link.path.split('/').pop().replace(/\.md$/, '');
-                if (parentByChild[targetName] !== undefined) {
-                    parentByChild[targetName].push(r.name);
-                }
-            });
-        });
-
-        // finalGraph[parent] = [children] — only root resources (no resource links to them)
-        const finalGraph = {};
-        const currentChildren = new Set();
-
-        Object.keys(parentByChild).forEach(name => {
-            if (!finalGraph[name]) finalGraph[name] = [];
-            parentByChild[name].forEach(parent => {
-                currentChildren.add(name);
-                if (!finalGraph[parent]) finalGraph[parent] = [name];
-                else if (!finalGraph[parent].includes(name)) finalGraph[parent].push(name);
-            });
-        });
-        currentChildren.forEach(name => { delete finalGraph[name]; });
-
-        const categoryByName = {};
-        resources.forEach(r => { categoryByName[r.name] = r.category; });
-
-        const categoryGroups = {};
-        Object.keys(parentByChild).forEach(name => {
-            if (parentByChild[name].length > 0) return;
-            const cat = categoryByName[name] ?? 'Otros';
-            if (!categoryGroups[cat]) categoryGroups[cat] = [];
-            categoryGroups[cat].push(name);
-        });
-
-        return { finalGraph, categoryGroups };
-    }, [resources, resourcePathSet]);
+    const resourceTree = dc.useMemo(() => buildResourceTree(resources), [resources]);
 
     const [searchTerm, setSearchTerm] = dc.useState('');
 
-    const filteredTree = dc.useMemo(() => {
-        const q = searchTerm.trim().toLowerCase();
-        if (!q) return { graph: finalGraph, cats: categoryGroups };
-
-        const graph = {};
-        Object.entries(finalGraph).forEach(([parent, children]) => {
-            if (parent.toLowerCase().includes(q)) {
-                graph[parent] = children;
-            } else {
-                const matching = children.filter(c => c.toLowerCase().includes(q));
-                if (matching.length > 0) graph[parent] = matching;
-            }
-        });
-
-        const cats = {};
-        Object.entries(categoryGroups).forEach(([cat, roots]) => {
-            const visible = roots.filter(r => graph[r] != null || r.toLowerCase().includes(q));
-            if (visible.length > 0) cats[cat] = visible;
-        });
-
-        return { graph, cats };
-    }, [finalGraph, categoryGroups, searchTerm]);
+    const filteredTree = dc.useMemo(
+        () => filterResourceTree(resourceTree, searchTerm),
+        [resourceTree, searchTerm]
+    );
 
     const activeResources = dc.useMemo(() => resources.filter(r => !r.isArchived), [resources]);
     const archivedList = dc.useMemo(() => resources.filter(r => r.isArchived), [resources]);
