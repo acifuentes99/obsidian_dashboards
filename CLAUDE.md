@@ -44,6 +44,28 @@ https://blacksmithgu.github.io/datacore/). Consult these when unsure about the `
    is the final check the unit tests can't replace — especially for the real
    query language, the live index, and visual/layout correctness.
 
+## QuickAdd
+
+Third mirrored folder: `quickadd-scripts/` → vault `Z. Meta/js-scripts/`
+(added to the `sync-to-vault.sh` mapping table alongside Datacore's two).
+
+[QuickAdd](https://github.com/chhoumann/quickadd) is an Obsidian plugin for
+user-defined macros/commands; its "User Script" macro type runs a plain
+Node-style JS file with `{ app, quickAddApi, ... }` injected. Right now this
+repo only uses that capability for **trigger scripts**: code that registers
+an `app.metadataCache.on("changed", ...)` listener (via a QuickAdd startup
+macro) to react when a note's frontmatter property changes — e.g.
+`status-date-sync.js` stamps `doneDate`/`coldDate`/`archivedDate` on
+`type/project` notes when `status` flips to `done`/`coldtask`/`archive`.
+`status-date-backfill.js` is a one-off QuickAdd command (not a trigger) that
+applies the same stamping retroactively to existing notes. No Templater
+scripts exist in this repo yet.
+
+Same workflow as Datacore: edit the `.js` file here, `npm run sync` to copy
+it into the vault's QuickAdd user-scripts folder, then re-run/re-attach the
+macro in Obsidian to pick up changes — there's no unit-test harness for
+these yet since they depend on live `app` events.
+
 ## Agent skills
 
 ### Issue tracker
