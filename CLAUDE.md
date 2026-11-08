@@ -1,3 +1,17 @@
+## Project tracking
+
+This repo's progress is tracked in the vault, not here:
+
+- Project note: `A. PARA Notes/Projects/Obsidian Dashboards 1st iteration Project.md`
+- Area note: `A. PARA Notes/Areas/Obsidian Dashboards Area Note.md` (the project's
+  `area` frontmatter links here; the Area note can accumulate other, future
+  projects in this same space)
+
+At session start, read the project note's `> [!info] About / Definition links`
+callout for context. Log session summaries under its `## Notes and Journal`
+section (or the linked journal note), per the global session-tracking
+convention.
+
 ## Datacore
 
 This repo is a git-tracked mirror of two folders from Andrew's Obsidian vault
