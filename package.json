@@ -1,0 +1,32 @@
+{
+  "name": "obsidian_dashbaords",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "sync": "bash scripts/sync-to-vault.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/acifuentes99/obsidian_dashboards.git"
+  },
+  "keywords": [],
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/acifuentes99/obsidian_dashboards/issues"
+  },
+  "homepage": "https://github.com/acifuentes99/obsidian_dashboards#readme",
+  "devDependencies": {
+    "@testing-library/preact": "^3.2.6",
+    "jsdom": "^31.0.0",
+    "luxon": "^3.7.2",
+    "preact": "^11.2.0",
+    "sucrase": "^3.35.1",
+    "vitest": "^5.1.0"
+  }
+}
