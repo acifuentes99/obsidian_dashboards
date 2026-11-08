@@ -37,6 +37,8 @@ const getTimestamp = (row) => {
     return dc.coerce.date(`${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`);
 };
 
+const getDate = (row, field) => dc.coerce.date(row.$frontmatter?.[field]?.value);
+
 const fmtDate = ts => ts ? ts.toFormat("LLL dd yyyy") : "—";
 const fmtTypes = types => types.join(", ") || "—";
 
@@ -67,20 +69,22 @@ return function View() {
                 const isBacklog = !isArchived && !isDone && (!status || status === 'backlog');
                 const isActive = !isArchived && !isDone && !isBacklog && !isColdTask;
                 const timestamp = getTimestamp(p);
+                const doneDate = getDate(p, "doneDate");
+                const coldDate = getDate(p, "coldDate");
+                const archivedDate = getDate(p, "archivedDate");
                 const ptRaw = p.$frontmatter?.projectType?.value;
                 const types = ptRaw ? (Array.isArray(ptRaw) ? ptRaw : [ptRaw]) : [];
-                return { link: p.$link, path: p.$path, name: p.$name ?? p.$path, status, types, timestamp, isDone, isArchived, isColdTask, isBacklog, isActive };
-            })
-            .sort(r => r.timestamp, "desc"),
+                return { link: p.$link, path: p.$path, name: p.$name ?? p.$path, status, types, timestamp, doneDate, coldDate, archivedDate, isDone, isArchived, isColdTask, isBacklog, isActive };
+            }),
         [typeToHide.join(",")]
     );
 
     const categories = dc.useMemo(() => ({
-        active:    projects.filter(r => r.isActive),
-        coldTasks: projects.filter(r => r.isColdTask),
-        backlog:   projects.filter(r => r.isBacklog),
-        archived:  projects.filter(r => r.isArchived),
-        done:      projects.filter(r => r.isDone),
+        active:    projects.filter(r => r.isActive).sort(r => r.timestamp, "desc"),
+        coldTasks: projects.filter(r => r.isColdTask).sort(r => r.coldDate, "desc"),
+        backlog:   projects.filter(r => r.isBacklog).sort(r => r.timestamp, "desc"),
+        archived:  projects.filter(r => r.isArchived).sort(r => r.archivedDate, "desc"),
+        done:      projects.filter(r => r.isDone).sort(r => r.doneDate, "desc"),
     }), [projects]);
 
     const updateStatus = async (path, newStatus) => {
@@ -97,9 +101,9 @@ return function View() {
     const nowrap = { whiteSpace: "nowrap" };
     const actionStyle = { ...nowrap, cursor: "pointer", color: "var(--text-accent)", fontSize: "0.85rem" };
 
-    const makeColumns = (actionLabel, actionStatus) => [
-        { id: "File",   value: r => r.link },
-        { id: "Date",   value: r => fmtDate(r.timestamp), render: (v) => <span style={nowrap}>{v}</span>, width: "minimum" },
+    const makeColumns = (actionLabel, actionStatus, dateField = "timestamp", dateLabel = "Date") => [
+        { id: "File",    value: r => r.link },
+        { id: dateLabel, value: r => fmtDate(r[dateField]), render: (v) => <span style={nowrap}>{v}</span>, width: "minimum" },
         { id: "Status", value: r => r.status ?? "—",      render: (v) => <span style={nowrap}>{v}</span>, width: "minimum" },
         { id: "Type",   value: r => fmtTypes(r.types),    render: (v) => <span style={nowrap}>{v}</span>, width: "minimum" },
         ...(actionLabel ? [{
@@ -111,9 +115,10 @@ return function View() {
     ];
 
     const ACTIVE_COLS   = makeColumns("To Backlog", "backlog");
-    const COLD_COLS     = makeColumns("To Active",  "active");
+    const COLD_COLS     = makeColumns("To Active",  "active", "coldDate", "Cold Date");
     const BACKLOG_COLS  = makeColumns("To Active",  "active");
-    const BASE_COLS     = makeColumns(null, null);
+    const DONE_COLS     = makeColumns(null, null, "doneDate", "Done Date");
+    const ARCHIVED_COLS = makeColumns(null, null, "archivedDate", "Archived Date");
 
     const Section = ({ title, rows, columns }) => {
         const [query, setQuery] = dc.useState("");
@@ -145,8 +150,8 @@ return function View() {
             <Section title="Active"     rows={categories?.active}    columns={ACTIVE_COLS}  />
             <Section title="Cold Tasks" rows={categories?.coldTasks} columns={COLD_COLS}    />
             <Section title="Backlog"    rows={categories?.backlog}   columns={BACKLOG_COLS} />
-            <Section title="Archived"   rows={categories?.archived}  columns={BASE_COLS}    />
-            <Section title="Done"       rows={categories?.done}      columns={BASE_COLS}    />
+            <Section title="Archived"   rows={categories?.archived}  columns={ARCHIVED_COLS} />
+            <Section title="Done"       rows={categories?.done}      columns={DONE_COLS}     />
         </div>
     );
 };
