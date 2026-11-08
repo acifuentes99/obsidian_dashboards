@@ -10,6 +10,8 @@ cssclasses:
 `button-lqz2`
 
 ```datacorejsx
+const CreationTimeline = await dc.require("Z. Meta/datacore/creationTimeline.jsx");
+
 const getTimestamp = (row) => {
     const v = row.$frontmatter?.timestamp?.value;
     if (!v) return null;
@@ -40,6 +42,9 @@ return function View() {
             const category = page.$frontmatter?.category?.value ?? 'Otros';
             const timestamp = getTimestamp(page);
             const outlinks = page.$links ?? [];
+            const displayTags = tags
+                .filter(t => t !== '#type/resource' && t !== '#archive')
+                .map(t => t.replace(/^#/, ''));
             return {
                 name: page.$name,
                 path: page.$path,
@@ -49,6 +54,7 @@ return function View() {
                 isArchived,
                 outlinks,
                 outlinksCount: outlinks.length,
+                tags: displayTags,
             };
         });
     }, [allResources]);
@@ -164,6 +170,9 @@ return function View() {
 
     return (
         <div>
+            <h1>Resource Creation Timeline</h1>
+            <CreationTimeline resources={resources} />
+
             <h1>Recent Resources</h1>
             <dc.Table rows={recentResources} columns={RECENT_COLS} paging={20} />
 
@@ -210,3 +219,5 @@ return function View() {
 # How to Use
 * Resources with sub-resources are shown nested under their parent in the tree
 * Archived = resource has `#archive` tag
+* The timeline at the top counts resources by creation date (`timestamp`) over the selected range — hover a point for names, click it to show a table (name, timestamp, tags) below. Resources with no `timestamp` aren't counted.
+* For presets other than "All time"/custom, drag the slider above the chart to pan that window back through past years (e.g. see "Last month" for any month, not just the current one). Click "Today" to snap back.

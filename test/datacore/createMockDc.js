@@ -70,6 +70,8 @@ export function createMockDc(overrides = {}) {
         Table,
         List,
 
+        luxon: { DateTime, Duration },
+
         ...overrides.extend,
     };
 }
