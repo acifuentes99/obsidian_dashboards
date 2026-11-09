@@ -29,6 +29,13 @@
 // "Select all"/"Select none" above the legend show/hide every line at once
 // — handy once seriesOrder gets long (e.g. 17 entries on the Note/Tags
 // dashboard) rather than clicking each legend entry individually.
+//
+// Animation: the whole chart fades/slides in the first time it scrolls into
+// view (IntersectionObserver, one-time), the chart area briefly dims and
+// recovers whenever a filter changes the bucketed data (range preset,
+// custom range, panning slider), and point markers transition cx/cy/r via
+// CSS so selecting a bucket (or any case where the same bucket key persists
+// across a re-render) animates instead of snapping.
 
 const timeline = await dc.require("Z. Meta/datacore/utils/timeline.js");
 const { RANGE_PRESETS } = timeline;
@@ -163,6 +170,20 @@ return function CreationTimeline({ resources, defaultRangeId = "30d", seriesOrde
     const [hiddenSeries, setHiddenSeries] = dc.useState(() => new Set());
     const [hoverPoint, setHoverPoint] = dc.useState(null); // { key, seriesId, x, y }
 
+    // Entrance animation: fade + slide up once, the first time the chart
+    // scrolls into view, rather than popping in fully rendered above the fold.
+    const rootRef = dc.useRef(null);
+    const [isVisible, setIsVisible] = dc.useState(false);
+    dc.useEffect(() => {
+        const el = rootRef.current;
+        if (!el || typeof IntersectionObserver === "undefined") { setIsVisible(true); return; }
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0]?.isIntersecting) { setIsVisible(true); observer.disconnect(); }
+        }, { threshold: 0.15 });
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, []);
+
     const isDarkTheme = typeof document !== "undefined" && document.body.classList.contains("theme-dark");
     const colorFor = (seriesId) => {
         if (seriesId === "other") return isDarkTheme ? OTHER_COLOR.dark : OTHER_COLOR.light;
@@ -216,6 +237,20 @@ return function CreationTimeline({ resources, defaultRangeId = "30d", seriesOrde
         }),
         [resources, range, isMultiSeries]
     );
+
+    // Filter-change pulse: whenever the bucketed data actually changes shape
+    // (range preset, custom range, panning slider) — not on first mount —
+    // briefly dim the chart and let the opacity transition bring it back,
+    // so a filter change reads as "the chart just updated" rather than an
+    // instant, silent swap.
+    const chartMountedRef = dc.useRef(false);
+    const [isFiltering, setIsFiltering] = dc.useState(false);
+    dc.useEffect(() => {
+        if (!chartMountedRef.current) { chartMountedRef.current = true; return; }
+        setIsFiltering(true);
+        const t = setTimeout(() => setIsFiltering(false), 220);
+        return () => clearTimeout(t);
+    }, [buckets]);
 
     dc.useEffect(() => { setAnchorKey(null); setHeadKey(null); }, [rangeId, customRange, anchorEnd]);
 
@@ -332,7 +367,15 @@ return function CreationTimeline({ resources, defaultRangeId = "30d", seriesOrde
     };
 
     return (
-        <div style={S.root}>
+        <div
+            ref={rootRef}
+            style={{
+                ...S.root,
+                opacity: isVisible ? 1 : 0,
+                transform: isVisible ? "translateY(0)" : "translateY(10px)",
+                transition: "opacity 450ms ease, transform 450ms ease",
+            }}
+        >
             <div style={S.controls}>
                 {RANGE_PRESETS.map((p) => (
                     <button key={p.id} style={S.btn(rangeId === p.id)} onClick={() => { setRangeId(p.id); setShowCustom(false); setAnchorEnd(null); }}>
@@ -400,7 +443,10 @@ return function CreationTimeline({ resources, defaultRangeId = "30d", seriesOrde
                         })}
                     </div>
 
-                    <div style={S.chartWrap} ref={chartWrapRef}>
+                    <div
+                        style={{ ...S.chartWrap, opacity: isFiltering ? 0.35 : 1, transition: "opacity 220ms ease" }}
+                        ref={chartWrapRef}
+                    >
                         <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: `${H}px`, display: "block" }}>
                             <line x1={PAD_L} y1={PAD_T + INNER_H} x2={W - PAD_R} y2={PAD_T + INNER_H} stroke="var(--background-modifier-border)" />
                             <text x={4} y={PAD_T + 4} style={S.axisLabel}>{seriesMax}</text>
@@ -428,7 +474,11 @@ return function CreationTimeline({ resources, defaultRangeId = "30d", seriesOrde
                                             const isSelected = selectedKeys.has(p.key);
                                             return (
                                                 <g key={p.key}>
-                                                    <circle cx={p.x} cy={p.y} r={isSelected ? 6 : 3} fill={color} stroke="var(--background-primary)" strokeWidth="1" />
+                                                    <circle
+                                                        cx={p.x} cy={p.y} r={isSelected ? 6 : 3} fill={color}
+                                                        stroke="var(--background-primary)" strokeWidth="1"
+                                                        style={{ transition: "cx 250ms ease, cy 250ms ease, r 150ms ease" }}
+                                                    />
                                                     <circle
                                                         cx={p.x} cy={p.y} r={9} fill="transparent" style={{ cursor: "pointer" }}
                                                         data-key={p.key} data-series={id}
@@ -468,7 +518,10 @@ return function CreationTimeline({ resources, defaultRangeId = "30d", seriesOrde
                 </>
             ) : (
                 <>
-                    <div style={S.chartWrap} ref={chartWrapRef}>
+                    <div
+                        style={{ ...S.chartWrap, opacity: isFiltering ? 0.35 : 1, transition: "opacity 220ms ease" }}
+                        ref={chartWrapRef}
+                    >
                         <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: `${H}px`, display: "block" }}>
                             <line x1={PAD_L} y1={PAD_T + INNER_H} x2={W - PAD_R} y2={PAD_T + INNER_H} stroke="var(--background-modifier-border)" />
                             <text x={4} y={PAD_T + 4} style={S.axisLabel}>{maxCount}</text>
@@ -493,6 +546,7 @@ return function CreationTimeline({ resources, defaultRangeId = "30d", seriesOrde
                                         fill={selectedKeys.has(p.key) ? "var(--interactive-accent)" : "var(--text-normal)"}
                                         stroke="var(--background-primary)"
                                         strokeWidth="1"
+                                        style={{ transition: "cx 250ms ease, cy 250ms ease, r 150ms ease" }}
                                     />
                                     <circle
                                         cx={p.x} cy={p.y} r={10} fill="transparent" style={{ cursor: "pointer" }}
