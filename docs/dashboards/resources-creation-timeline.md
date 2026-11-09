@@ -9,7 +9,10 @@ that context.
 
 `datacore/creationTimeline.jsx` (component) + `datacore/utils/timeline.js`
 (pure bucketing logic, dc.require'd separately so it's unit-testable without
-rendering anything).
+rendering anything). Both are now also used, in multi-series mode, by the
+[Note/Tags dashboard's timeline](note-tags-creation-timeline.md) — that doc
+covers the `seriesOrder`/`seriesLabels` props and legend; omitting them (as
+below) keeps this single-line chart exactly as it was.
 
 ```jsx
 const CreationTimeline = await dc.require("Z. Meta/datacore/creationTimeline.jsx");
@@ -22,8 +25,8 @@ its `#type/resource` query — the timeline doesn't run its own query.
 ## Behavior
 
 - **Range control**: preset buttons (Last week / 2 weeks / month / 3 months /
-  6 months / year / All time) plus a custom date-range picker. "All time"
-  starts at the oldest *dated* resource, not a fixed lookback.
+  6 months / year / 2 years / All time) plus a custom date-range picker.
+  "All time" starts at the oldest *dated* resource, not a fixed lookback.
 - **Bucket granularity is adaptive**, not fixed, because the vault's
   timestamps span ~6.5 years (2020-05-09 → present) — a fixed daily bucket
   would make "All time" ~2,400 points. Rule (`granularityForSpan` in
@@ -43,11 +46,17 @@ its `#type/resource` query — the timeline doesn't run its own query.
   picked window size.
 - **Hover** a point → tooltip with the bucket's label, count, and resource
   names (capped at 8 inline, "+N more" beyond that).
-- **Click** a point → selects it (single-select; click again to clear, click
-  a different point to swap) and renders that bucket's resources as a
-  `dc.Table` below the chart (Name / Timestamp / Tags columns), reusing the
-  same `value: r => r.link` pattern the rest of `Resources.md` already uses
-  for clickable links in `dc.Table` columns.
+- **Click** a point → selects it (click again to clear, click a different
+  point to swap) and renders that bucket's resources as a `dc.Table` below
+  the chart (Name / Timestamp / Tags columns), reusing the same
+  `value: r => r.link` pattern the rest of `Resources.md` already uses for
+  clickable links in `dc.Table` columns. **Shift-click** a second point to
+  extend the selection to every bucket in between (inclusive,
+  order-independent) — the table merges all selected buckets' resources into
+  one list, titled with the bucket range. This range-select is implemented
+  once in the shared component (see
+  [note-tags-creation-timeline.md](note-tags-creation-timeline.md)) and
+  applies here unchanged.
 - Hand-rolled SVG — no charting library. None existed anywhere in this repo
   or in Datacore's own docs at the time this was built, and a single polyline
   + circles doesn't need one.

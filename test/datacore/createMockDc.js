@@ -69,6 +69,11 @@ export function createMockDc(overrides = {}) {
 
         Table,
         List,
+        // Real Datacore's dc.Literal renders a Link (or other Literal) value
+        // "prettily" (resolves to a clickable Obsidian link, etc.) — the mock
+        // fixtures only ever use plain strings for `link`, so just render
+        // the value as-is.
+        Literal: ({ value }) => value,
 
         luxon: { DateTime, Duration },
 

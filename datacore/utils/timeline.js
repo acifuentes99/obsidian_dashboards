@@ -1,11 +1,17 @@
-// Pure date-bucketing helpers for note-creation timelines (currently used by
-// the Resources dashboard's creation timeline).
+// Pure date-bucketing helpers for note-creation timelines, shared by the
+// Resources dashboard's (single-series) creation timeline and the Note/Tags
+// dashboard's (multi-series, by note type) one.
 //
 //   const timeline = await dc.require("Z. Meta/datacore/utils/timeline.js");
 //
 // Input shape expected everywhere below:
 //   resources: [{ name, path, link, timestamp: Luxon DateTime | null }]
 // Items with a null/undefined timestamp are never bucketed.
+//
+// buildBuckets() takes an optional `seriesKey(resource) => string` — when
+// given, each bucket also gets a `series` map of { [key]: { count, items } }
+// alongside its existing aggregate `count`/`items`. Omit it (as the Resources
+// dashboard does) to get exactly the single-series shape this always had.
 
 const { DateTime } = dc.luxon;
 
@@ -16,6 +22,7 @@ const RANGE_PRESETS = [
     { id: "90d", label: "Last 3 months", days: 90 },
     { id: "180d", label: "Last 6 months", days: 180 },
     { id: "365d", label: "Last year", days: 365 },
+    { id: "730d", label: "Last 2 years", days: 730 },
     { id: "all", label: "All time", days: null },
 ];
 
@@ -52,7 +59,7 @@ function resolveRange(rangeId, resources, customRange, now = DateTime.now()) {
     return { start: now.minus({ days: preset.days }).startOf("day"), end: now.endOf("day") };
 }
 
-function buildBuckets({ resources, start, end }) {
+function buildBuckets({ resources, start, end, seriesKey }) {
     const spanDays = Math.max(1, end.diff(start, "days").days);
     const granularity = granularityForSpan(spanDays);
 
@@ -64,6 +71,7 @@ function buildBuckets({ resources, start, end }) {
     while (cursor <= endBoundary) {
         const key = cursor.toISODate();
         const bucket = { key, start: cursor, label: bucketLabel(cursor, granularity), count: 0, items: [] };
+        if (seriesKey) bucket.series = {};
         buckets.push(bucket);
         byKey.set(key, bucket);
         cursor = nextBucket(cursor, granularity);
@@ -76,6 +84,12 @@ function buildBuckets({ resources, start, end }) {
         if (!bucket) return;
         bucket.count += 1;
         bucket.items.push(r);
+        if (seriesKey) {
+            const key = seriesKey(r);
+            if (!bucket.series[key]) bucket.series[key] = { count: 0, items: [] };
+            bucket.series[key].count += 1;
+            bucket.series[key].items.push(r);
+        }
     });
 
     return { granularity, buckets };
