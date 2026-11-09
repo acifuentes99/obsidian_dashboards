@@ -202,6 +202,33 @@ than inventing a new tone) before falling through to the categorical/
 generated lookup for every other id. Text in the legend stays in normal
 ink regardless of path — only the swatch carries the series color.
 
+## Animation
+
+Three small, cheap touches (shared via `creationTimeline.jsx`, so both this
+dashboard and Resources get them for free):
+
+- **Scroll-in**: the whole chart fades and slides up once, the first time it
+  scrolls into the viewport (`IntersectionObserver`, disconnects after
+  firing). In environments with no `IntersectionObserver` (the test
+  harness), it falls back to showing immediately — no animation, no crash.
+- **Filter pulse**: whenever a range preset, custom range, or the panning
+  slider actually changes the bucketed data, the chart area dims to ~35%
+  opacity for 220ms and recovers via CSS transition — a visible "this just
+  updated" cue instead of a silent, instant swap. Keyed off `buckets`
+  itself, skipped on first mount, so it doesn't fire on initial render.
+- **Point transitions**: marker circles get a CSS transition on `cx`/`cy`/`r`
+  (not `points`/`d` — those have no CSS-animatable equivalent, so the
+  polyline itself still redraws instantly). This mostly matters for
+  selection: clicking a bucket to grow its dot from radius 3 to 6 animates
+  rather than snapping, since that bucket's key — and thus its DOM node —
+  persists across the re-render.
+
+Not covered: cross-range transitions (switching "Last 30 days" to "Last
+year" remounts almost every point, since bucket keys depend on the window),
+and the line path itself. Both would need a tweened/interpolated redraw
+(e.g. a RAF loop lerping bucket positions) rather than CSS, judged not worth
+the complexity for this dashboard's scale.
+
 ## Testing
 
 - `test/datacore/timeline-utils.test.js` — `buildBuckets({ seriesKey })`
