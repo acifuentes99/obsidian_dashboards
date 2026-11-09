@@ -155,5 +155,5 @@ return function View() {
 # How to Use
 * Resources with sub-resources are shown nested under their parent in the tree
 * Archived = resource has `#archive` tag
-* The timeline at the top counts resources by creation date (`timestamp`) over the selected range — hover a point for names, click it to show a table (name, timestamp, tags) below. Resources with no `timestamp` aren't counted.
+* The timeline at the top counts resources by creation date (`timestamp`) over the selected range — hover a point for names, click it to show a table (name, timestamp, tags) below. Shift-click a second point to select every bucket in between (e.g. a whole week) and merge their notes into that table. Click a column header to sort the table by it; click again to reverse. Resources with no `timestamp` aren't counted.
 * For presets other than "All time"/custom, drag the slider above the chart to pan that window back through past years (e.g. see "Last month" for any month, not just the current one). Click "Today" to snap back.

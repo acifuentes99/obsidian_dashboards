@@ -29,6 +29,11 @@ export class DCArray extends Array {
         return this.filter(predicate);
     }
 
+    /** DataArray-style limit: first `n` rows, as a new array (non-mutating). */
+    limit(n) {
+        return DCArray.from(this.slice(0, n));
+    }
+
     groupBy(key) {
         if (this.length === 0) return DCArray.from([]);
         const sorted = DCArray.from(this).sort(key, "asc");

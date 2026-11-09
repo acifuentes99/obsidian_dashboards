@@ -13,9 +13,63 @@ cssclass: no-hover
 ---
 
 ```datacorejsx
-const Calendar = await dc.require("Z. Meta/datacore/calendar.jsx");
+const CreationTimeline = await dc.require("Z. Meta/datacore/creationTimeline.jsx");
 
 let somestring = '';
+
+// Every recognized #type/* tag gets its own line — see
+// docs/dashboards/note-tags-creation-timeline.md. Order is fixed (also the
+// color order via creationTimeline.jsx's colorFor — never reassigned by
+// count/visibility) and mirrors getEmojiPrefix()'s own precedence below, so
+// a note's chart series always agrees with its emoji. "other" is the
+// residual: any #type/* tag not in this list, or no type tag at all.
+const SERIES_ORDER = [
+    "project", "resource", "area",
+    "note-contact", "note-checklist", "note-brainstorm", "note-documentation",
+    "note-list", "note-research", "note-study", "note-summary", "note-thoughts",
+    "note-articlenote", "note-book", "note-experience", "note-default",
+    "other",
+];
+const SERIES_LABELS = {
+    project: "Project",
+    resource: "Resource",
+    area: "Area",
+    "note-contact": "Note (contact)",
+    "note-checklist": "Note (checklist)",
+    "note-brainstorm": "Note (brainstorm)",
+    "note-documentation": "Note (documentation)",
+    "note-list": "Note (list)",
+    "note-research": "Note (research)",
+    "note-study": "Note (study)",
+    "note-summary": "Note (summary)",
+    "note-thoughts": "Note (thoughts)",
+    "note-articlenote": "Note (article note)",
+    "note-book": "Note (book)",
+    "note-experience": "Note (experience)",
+    "note-default": "Note (default)",
+    other: "Other",
+};
+
+const resolveSeries = (tags) => {
+    if (tags.includes('#type/project')) return { series: 'project', typeLabel: 'project' };
+    if (tags.includes('#type/resource')) return { series: 'resource', typeLabel: 'resource' };
+    if (tags.includes('#type/area')) return { series: 'area', typeLabel: 'area' };
+    if (tags.includes('#type/note/contact')) return { series: 'note-contact', typeLabel: 'note/contact' };
+    if (tags.includes('#type/note/checklist')) return { series: 'note-checklist', typeLabel: 'note/checklist' };
+    if (tags.includes('#type/note/brainstorm')) return { series: 'note-brainstorm', typeLabel: 'note/brainstorm' };
+    if (tags.includes('#type/note/documentation')) return { series: 'note-documentation', typeLabel: 'note/documentation' };
+    if (tags.includes('#type/note/list')) return { series: 'note-list', typeLabel: 'note/list' };
+    if (tags.includes('#type/note/research')) return { series: 'note-research', typeLabel: 'note/research' };
+    if (tags.includes('#type/note/study')) return { series: 'note-study', typeLabel: 'note/study' };
+    if (tags.includes('#type/note/summary')) return { series: 'note-summary', typeLabel: 'note/summary' };
+    if (tags.includes('#type/note/thoughts')) return { series: 'note-thoughts', typeLabel: 'note/thoughts' };
+    if (tags.includes('#type/note/articlenote')) return { series: 'note-articlenote', typeLabel: 'note/articlenote' };
+    if (tags.includes('#type/note/book')) return { series: 'note-book', typeLabel: 'note/book' };
+    if (tags.includes('#type/note/experience')) return { series: 'note-experience', typeLabel: 'note/experience' };
+    if (tags.includes('#type/note/default')) return { series: 'note-default', typeLabel: 'note/default' };
+    const otherType = tags.find((t) => t.startsWith('#type/'));
+    return { series: 'other', typeLabel: otherType ? otherType.replace(/^#type\//, '') : 'untyped' };
+};
 
 const getEmojiPrefix = (pFile, hasLinks) => {
         let l = '';
@@ -135,6 +189,26 @@ return function View() {
 	const dvQuery = dc.useQuery(query, {debounce : 5000});
 	//const dvQuery = dc.useFullQuery(query, {debounce : 5000});
 
+	// The query above stays broad (same ~2200-note scan as `results` below) —
+	// Datacore can't reliably date-filter on `timestamp` in the query string
+	// itself, since that frontmatter field's format is inconsistent across
+	// the vault. The chart's own range selector (default 6 months) windows
+	// this same array in JS before bucketing, same approach as Resources.md.
+	const chartResources = dc.useMemo(() => dvQuery.map((p) => {
+		const tags = p.$tags ?? [];
+		const { series, typeLabel } = resolveSeries(tags);
+		return {
+			name: p.$name,
+			path: p.$path,
+			link: p.$link,
+			timestamp: getTimestamp(dc, p),
+			series,
+			typeLabel,
+			icon: getEmojiPrefix(p, false),
+			tags: tags.map((t) => t.replace(/^#/, '')),
+		};
+	}), [dvQuery]);
+
 	const results = dc.useArray(dvQuery, array => {
 		const sorted = array
 			.map(result => ({...result,
@@ -155,7 +229,9 @@ return function View() {
 	};
 	return (
 		<div>
-			<Calendar pages={dvQuery} getDate={(p) => getTimestamp(dc, p)} getFile={(p) => p.$path || ""} getLabel={(p) => p.$name || ""} />
+			<h1>Note Creation Timeline</h1>
+			<CreationTimeline resources={chartResources} seriesOrder={SERIES_ORDER} seriesLabels={SERIES_LABELS} defaultRangeId="180d" />
+
 			<p>{somestring}</p>
 			<div style={{ display: "flex", alignItems: "center", gap: "0.5rem", margin: "0.5rem 0" }}>
 				<button style={btnStyle} onClick={() => setShowAll(v => !v)}>
@@ -171,3 +247,9 @@ return function View() {
 	);
 }
 ```
+
+# How to Use
+* The timeline counts notes by creation date (`timestamp`), one line per type (every `#type/*` tag gets its own line, plus "Other" for anything unrecognized or untagged) — click a legend entry to show/hide that line. "Select all"/"Select none" above the legend toggle every line at once — handy for isolating just one or two types out of the 17.
+* Click a point to drill into that bucket's notes below (every type, not just the clicked line); Shift-click a second point to select every bucket in between (e.g. a whole week) and merge their notes into that table. Click the same single point again to clear the selection.
+* The drill-down table's Name column shows each note's type emoji (same icons as the list below). Click a column header to sort the table by it; click again to reverse.
+* Notes with no `timestamp`, or outside the selected range, aren't counted. Defaults to the last 6 months — switch presets or use a custom range for more.

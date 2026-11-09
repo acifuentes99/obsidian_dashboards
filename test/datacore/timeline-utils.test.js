@@ -81,4 +81,47 @@ describe("timeline utils (datacore/utils/timeline.js)", () => {
 
         expect(buckets.reduce((sum, b) => sum + b.count, 0)).toBe(1);
     });
+
+    it("has a 730d ('Last 2 years') preset", async () => {
+        const timeline = await loadTimelineUtils();
+        expect(timeline.RANGE_PRESETS.find((p) => p.id === "730d")).toMatchObject({ days: 730 });
+    });
+
+    describe("multi-series buckets (seriesKey)", () => {
+        function typed(name, isoDate, series) {
+            return { ...res(name, isoDate), series };
+        }
+
+        it("splits aggregate count/items into a per-series breakdown while keeping the aggregate intact", async () => {
+            const timeline = await loadTimelineUtils();
+            const now = DateTime.fromISO("2026-11-08T12:00:00");
+            const resources = [
+                typed("A", "2026-11-08T09:00:00", "project"),
+                typed("B", "2026-11-08T10:00:00", "resource"),
+                typed("C", "2026-11-08T11:00:00", "project"),
+            ];
+
+            const range = timeline.resolveRange("7d", resources, null, now);
+            const { buckets } = timeline.buildBuckets({ resources, ...range, seriesKey: (r) => r.series });
+
+            const nov8 = buckets.find((b) => b.key === "2026-11-08");
+            expect(nov8.count).toBe(3);
+            expect(nov8.items.map((r) => r.name).sort()).toEqual(["A", "B", "C"]);
+            expect(nov8.series.project.count).toBe(2);
+            expect(nov8.series.project.items.map((r) => r.name).sort()).toEqual(["A", "C"]);
+            expect(nov8.series.resource.count).toBe(1);
+            expect(nov8.series.resource.items.map((r) => r.name)).toEqual(["B"]);
+        });
+
+        it("omits the `series` map entirely when no seriesKey is given (legacy shape)", async () => {
+            const timeline = await loadTimelineUtils();
+            const now = DateTime.fromISO("2026-11-08T12:00:00");
+            const resources = [res("A", "2026-11-08T09:00:00")];
+
+            const range = timeline.resolveRange("7d", resources, null, now);
+            const { buckets } = timeline.buildBuckets({ resources, ...range });
+
+            expect(buckets.find((b) => b.key === "2026-11-08").series).toBeUndefined();
+        });
+    });
 });

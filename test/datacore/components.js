@@ -6,7 +6,10 @@ import { h } from "preact";
 export function Table({ rows = [], columns = [], paging, class: className }) {
     const visibleRows = typeof paging === "number" ? rows.slice(0, paging) : rows;
     return h("table", { className }, [
-        h("thead", { key: "thead" }, h("tr", null, columns.map((col) => h("th", { key: col.id }, col.id)))),
+        h("thead", { key: "thead" }, h("tr", null, columns.map((col) => {
+            const title = typeof col.title === "function" ? col.title() : (col.title ?? col.id);
+            return h("th", { key: col.id }, title);
+        }))),
         h(
             "tbody",
             { key: "tbody" },
@@ -25,10 +28,14 @@ export function Table({ rows = [], columns = [], paging, class: className }) {
     ]);
 }
 
-export function List({ rows = [], renderer }) {
+export function List({ rows = [], renderer, paging }) {
+    // Datacore's real dc.List flattens groupBy() output (rows shaped like
+    // { key, rows: [...] }) rather than rendering the group wrapper itself.
+    const flat = rows.flatMap((row) => (Array.isArray(row?.rows) ? row.rows : [row]));
+    const visible = typeof paging === "number" ? flat.slice(0, paging) : flat;
     return h(
         "ul",
         null,
-        rows.map((row, i) => h("li", { key: i }, renderer ? renderer(row) : String(row)))
+        visible.map((row, i) => h("li", { key: i }, renderer ? renderer(row) : String(row)))
     );
 }
