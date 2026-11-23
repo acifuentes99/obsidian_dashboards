@@ -12,9 +12,17 @@ import { createMockDc } from "./createMockDc.js";
 
 const UTIL_PATH = join(process.cwd(), "datacore", "utils", "areaProjects.js");
 
+function vaultPathToLocal(vaultPath) {
+    return join(process.cwd(), vaultPath.replace(/^Z\. Meta\/datacore\//, "datacore/"));
+}
+
+// This module itself does `await dc.require("Z. Meta/datacore/utils/timeline.js")`
+// for the timeline functions below, so the mock `dc` needs a working
+// `dc.require` too (same pattern as creation-timeline.test.js).
 async function loadAreaProjectsUtils() {
-    const source = readFileSync(UTIL_PATH, "utf8");
-    return runDatacoreBlock(source, createMockDc({}));
+    const dc = createMockDc({});
+    dc.require = async (vaultPath) => runDatacoreBlock(readFileSync(vaultPathToLocal(vaultPath), "utf8"), dc);
+    return runDatacoreBlock(readFileSync(UTIL_PATH, "utf8"), dc);
 }
 
 describe("categorizeProject (datacore/utils/areaProjects.js)", () => {
@@ -101,5 +109,112 @@ describe("daysUntilTarget / formatDaysUntil (datacore/utils/areaProjects.js)", (
         const days = daysUntilTarget("2026-11-23", now);
         expect(days).toBe(0);
         expect(formatDaysUntil(days)).toBe("Due today");
+    });
+});
+
+describe("barGeometry (datacore/utils/areaProjects.js)", () => {
+    const windowStart = DateTime.fromISO("2026-01-01");
+    const windowEnd = DateTime.fromISO("2026-01-31");
+    const now = DateTime.fromISO("2026-01-15");
+
+    it("returns null when there's no start date to place the bar at", async () => {
+        const { barGeometry } = await loadAreaProjectsUtils();
+        expect(barGeometry({ start: null, end: null, windowStart, windowEnd, now })).toBeNull();
+    });
+
+    it("positions a fully-contained, closed bar by percentage of the window", async () => {
+        const { barGeometry } = await loadAreaProjectsUtils();
+        const geom = barGeometry({
+            start: DateTime.fromISO("2026-01-11"), // 10 days in of a 30-day window
+            end: DateTime.fromISO("2026-01-21"),   // 20 days in
+            windowStart, windowEnd, now,
+        });
+        expect(geom.visible).toBe(true);
+        expect(geom.leftPct).toBeCloseTo((10 / 30) * 100, 1);
+        expect(geom.widthPct).toBeCloseTo((10 / 30) * 100, 1);
+        expect(geom.clampedLeft).toBe(false);
+        expect(geom.clampedRight).toBe(false);
+        expect(geom.openEnded).toBe(false);
+    });
+
+    it("clamps a bar that started before the window, flagging clampedLeft", async () => {
+        const { barGeometry } = await loadAreaProjectsUtils();
+        const geom = barGeometry({
+            start: DateTime.fromISO("2025-06-01"),
+            end: DateTime.fromISO("2026-01-11"),
+            windowStart, windowEnd, now,
+        });
+        expect(geom.visible).toBe(true);
+        expect(geom.leftPct).toBe(0);
+        expect(geom.clampedLeft).toBe(true);
+        expect(geom.clampedRight).toBe(false);
+    });
+
+    it("clamps a bar that ends after the window, flagging clampedRight", async () => {
+        const { barGeometry } = await loadAreaProjectsUtils();
+        const geom = barGeometry({
+            start: DateTime.fromISO("2026-01-21"),
+            end: DateTime.fromISO("2026-06-01"),
+            windowStart, windowEnd, now,
+        });
+        expect(geom.visible).toBe(true);
+        expect(geom.clampedRight).toBe(true);
+    });
+
+    it("is invisible when entirely before or entirely after the window", async () => {
+        const { barGeometry } = await loadAreaProjectsUtils();
+        const before = barGeometry({ start: DateTime.fromISO("2025-01-01"), end: DateTime.fromISO("2025-02-01"), windowStart, windowEnd, now });
+        const after = barGeometry({ start: DateTime.fromISO("2026-06-01"), end: DateTime.fromISO("2026-07-01"), windowStart, windowEnd, now });
+        expect(before.visible).toBe(false);
+        expect(after.visible).toBe(false);
+    });
+
+    it("treats a null end as open-ended, running through to 'now' instead of the window end", async () => {
+        const { barGeometry } = await loadAreaProjectsUtils();
+        const geom = barGeometry({ start: DateTime.fromISO("2026-01-01"), end: null, windowStart, windowEnd, now });
+        expect(geom.openEnded).toBe(true);
+        // now = Jan 15, 14 days into the 30-day window — not clamped to the
+        // window's right edge (Jan 31), since it stops at "now" instead.
+        expect(geom.clampedRight).toBe(false);
+        expect(geom.widthPct).toBeCloseTo((14 / 30) * 100, 1);
+    });
+});
+
+describe("todayMarkerPct (datacore/utils/areaProjects.js)", () => {
+    const windowStart = DateTime.fromISO("2026-01-01");
+    const windowEnd = DateTime.fromISO("2026-01-31");
+
+    it("positions today by percentage of the window when inside it", async () => {
+        const { todayMarkerPct } = await loadAreaProjectsUtils();
+        const pct = todayMarkerPct(windowStart, windowEnd, DateTime.fromISO("2026-01-16"));
+        expect(pct).toBeCloseTo(50, 0);
+    });
+
+    it("returns null when today falls outside the window", async () => {
+        const { todayMarkerPct } = await loadAreaProjectsUtils();
+        expect(todayMarkerPct(windowStart, windowEnd, DateTime.fromISO("2025-01-01"))).toBeNull();
+        expect(todayMarkerPct(windowStart, windowEnd, DateTime.fromISO("2027-01-01"))).toBeNull();
+    });
+});
+
+describe("resolveTimelineWindow (datacore/utils/areaProjects.js)", () => {
+    it("anchors a day-based preset's window on the given anchor date", async () => {
+        const { resolveTimelineWindow } = await loadAreaProjectsUtils();
+        const anchor = DateTime.fromISO("2026-11-23");
+        const { start, end } = resolveTimelineWindow("90d", [], anchor);
+        expect(end.toISODate()).toBe(anchor.toISODate());
+        expect(start.toISODate()).toBe(anchor.minus({ days: 90 }).toISODate());
+    });
+
+    it("'all' spans from the earliest created date to the furthest end date or target, not just to now", async () => {
+        const { resolveTimelineWindow } = await loadAreaProjectsUtils();
+        const now = DateTime.fromISO("2026-06-01");
+        const rows = [
+            { created: DateTime.fromISO("2024-01-01"), end: DateTime.fromISO("2024-06-01") },
+            { created: DateTime.fromISO("2026-01-01"), end: DateTime.fromISO("2027-01-01") }, // future target
+        ];
+        const { start, end } = resolveTimelineWindow("all", rows, now);
+        expect(start.toISODate()).toBe("2024-01-01");
+        expect(end.toISODate()).toBe("2027-01-01"); // reaches past "now", unlike timeline.js's own "all"
     });
 });

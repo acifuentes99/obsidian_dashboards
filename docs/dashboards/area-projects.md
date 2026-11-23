@@ -69,6 +69,54 @@ same vault-wide inconsistency (ISO datetime vs. a bare `YYYYMMDDHHmm`
 integer; see `docs/dashboards/note-tags-creation-timeline.md`) that function
 already coerces. Shown as-is, doesn't affect the table's sort order.
 
+## Timeline
+
+A second, separate presentational component, `datacore/areaProjectsTimeline.jsx`
+(`dc.require`d and rendered by `areaProjects.jsx` itself, fed the same
+`projects` array the badges/table already computed — no second query),
+renders one horizontal bar per dated project: start = `created`, end =
+whichever of `target`/`doneDate`/`archivedDate`/`coldDate` is set, or, if
+none are, `null` — drawn as an "ongoing" bar (faded, titled "Ongoing, no
+target set") running through to today instead of stopping at a fixed point.
+Shows **every** matching project regardless of status, independent of the
+table's "Show done/archived" toggle, since the point here is the area's
+whole history, not just what's still active.
+
+- **Window + scrolling**: a row of range-preset buttons (reusing a curated
+  subset of `timeline.js`'s own `RANGE_PRESETS` ids — `90d`/`180d`/`365d`/
+  `730d`/`all` — rather than forking a second preset list, since
+  `resolveRange` looks ids up in that module's own hardcoded array, not a
+  parameter) plus ◀/▶ buttons that shift an `anchor` date by the active
+  preset's span, and a "Today" button that jumps back. `all` isn't reused
+  as-is: timeline.js's own "all" branch stops at *now*, but a project's bar
+  can run past today (a future `target`), so `resolveTimelineWindow` here
+  spans from the earliest `created` to the furthest `end`-or-target across
+  every row instead.
+- **Clamped bars**: a bar that starts before, or (still) runs past, the
+  visible window gets a small ‹/› arrow rather than being silently cut off
+  with no indication there's more outside the frame.
+- **Today marker**: a vertical line across all rows when today falls inside
+  the current window, absent otherwise (e.g. after panning away from it).
+- Rows with no `created` date can't be placed on the axis and are skipped,
+  with a count shown below ("N project(s) with no creation date aren't
+  shown here.").
+
+Two gotchas carried over from elsewhere in this repo, deliberately avoided
+here rather than rediscovered the hard way:
+
+- **The `dc.Literal` gotcha** (`docs/dashboards/note-tags-creation-timeline.md`):
+  a row's `link` is a real Datacore `Link`, not a string — rendered via
+  `<dc.Literal value={r.link} />`, not `{r.link}`, since it's one child
+  among several in that row's JSX rather than a bare returned value.
+  Confirmed by test (fixtures use plain strings for `link`, so this is a
+  production-only path the test harness can't catch).
+- **The `DataArray.sort()` gotcha** (this dashboard's own table, above):
+  `rows` here can be a Datacore DataArray (from `areaProjects.jsx`) or a
+  plain array (tests) — rather than relying on which one it happens to be,
+  it's normalized to a plain array (`Array.from(rows)`) before any sorting,
+  so a native comparator (`(a, b) => a.created - b.created`) behaves
+  correctly regardless of the input's real type.
+
 ## Gotcha: a trailing comment can swallow the block's closing syntax
 
 Hit on first real-world use: the header comment above originally showed the
@@ -101,9 +149,17 @@ note to backfill.
 
 - `test/datacore/area-projects-utils.test.js` — `categorizeProject`'s
   priority/exclusivity (including the inconsistent-frontmatter case),
-  `matchesArea` against every frontmatter shape above, and
-  `daysUntilTarget`/`formatDaysUntil` across future/past/today/missing.
+  `matchesArea` against every frontmatter shape above,
+  `daysUntilTarget`/`formatDaysUntil` across future/past/today/missing, and
+  the timeline's `barGeometry`/`todayMarkerPct`/`resolveTimelineWindow`
+  (containment, left/right clamping, open-ended bars stopping at "now" not
+  the window edge, and `all`'s future-reaching span).
 - `test/datacore/area-projects.test.js` — filtering to only the current
   area's projects, the five count badges, the done/archived toggle, target-
-  date sort order (including the `Infinity`-key regression above), and
-  overdue vs. upcoming formatting.
+  date sort order (including the `Infinity`-key regression above), overdue
+  vs. upcoming formatting, and the Created column (including the
+  bare-integer timestamp format).
+- `test/datacore/area-projects-timeline.test.js` — chronological row order,
+  the skipped-rows count, the today marker appearing/disappearing as the
+  window pans, range-preset switching, panning disabled on `all`, the
+  clamped-bar arrows, and the open-ended-bar marker.

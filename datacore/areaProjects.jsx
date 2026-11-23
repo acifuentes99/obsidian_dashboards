@@ -17,26 +17,14 @@
 //       return <AreaProjects />;   // pass area={someFile} to target another note
 //   }
 
-const { STATUS_BUCKETS, categorizeProject, matchesArea, daysUntilTarget, formatDaysUntil } =
+const { STATUS_BUCKETS, BUCKET_COLOR, categorizeProject, matchesArea, daysUntilTarget, formatDaysUntil } =
     await dc.require("Z. Meta/datacore/utils/areaProjects.js");
 // `timestamp` frontmatter is inconsistently typed across the vault (ISO vs.
 // a bare YYYYMMDDHHmm integer, see docs/dashboards/note-tags-creation-timeline.md)
 // — reuse commons.js's existing coercion rather than a 4th copy of it
 // (Projects.md, the Note/Tags dashboard, and commons.js itself already have one).
 const { getTimestamp } = await dc.require("Z. Meta/datacore/utils/commons.js");
-
-// Reuses 5 of creationTimeline.jsx's 8 dataviz-skill-validated categorical
-// slots (see that file and docs/dashboards/note-tags-creation-timeline.md
-// for the palette's source/validation) rather than re-deriving new hues —
-// same light/dark pairs, picked for a sensible status association (blue
-// "in progress", green "done", red "archived"/closed).
-const BUCKET_COLOR = {
-    active: { light: "#2a78d6", dark: "#3987e5" },
-    backlog: { light: "#eda100", dark: "#c98500" },
-    coldtask: { light: "#4a3aa7", dark: "#9085e9" },
-    archived: { light: "#e34948", dark: "#e66767" },
-    done: { light: "#1baf7a", dark: "#199e70" },
-};
+const AreaProjectsTimeline = await dc.require("Z. Meta/datacore/areaProjectsTimeline.jsx");
 
 const BUCKET_LABEL = Object.fromEntries(STATUS_BUCKETS.map((b) => [b.id, b.label]));
 
@@ -76,9 +64,18 @@ return function AreaProjects({ area: areaProp } = {}) {
                 const status = p.$frontmatter?.status?.value;
                 const tags = p.$tags ?? [];
                 const bucket = categorizeProject({ status, tags });
+                const target = dc.coerce.date(p.$frontmatter?.target?.value);
                 const daysUntil = daysUntilTarget(p.$frontmatter?.target?.value);
                 const created = getTimestamp(dc, p);
-                return { link: p.$link, path: p.$path, name: p.$name ?? p.$path, bucket, daysUntil, created };
+                // The timeline's bar end: whichever resolved date applies —
+                // `target` for anything still open, else whenever the project
+                // actually finished/stopped. `null` (none set) means "still
+                // open", which areaProjectsTimeline.jsx draws through to today.
+                const doneDate = dc.coerce.date(p.$frontmatter?.doneDate?.value);
+                const archivedDate = dc.coerce.date(p.$frontmatter?.archivedDate?.value);
+                const coldDate = dc.coerce.date(p.$frontmatter?.coldDate?.value);
+                const end = target ?? doneDate ?? archivedDate ?? coldDate ?? null;
+                return { link: p.$link, path: p.$path, name: p.$name ?? p.$path, bucket, daysUntil, created, end };
             }),
         [areaFile?.$path]
     );
@@ -116,6 +113,7 @@ return function AreaProjects({ area: areaProp } = {}) {
                     </span>
                 ))}
             </div>
+            <AreaProjectsTimeline rows={projects} />
             {rows.length === 0
                 ? <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>No related projects.</p>
                 : <dc.Table class="no-hover" rows={rows} columns={COLUMNS} paging={20} />}
