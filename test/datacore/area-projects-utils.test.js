@@ -112,6 +112,36 @@ describe("daysUntilTarget / formatDaysUntil (datacore/utils/areaProjects.js)", (
     });
 });
 
+describe("resolveProjectEnd (datacore/utils/areaProjects.js)", () => {
+    const doneDate = DateTime.fromISO("2026-03-01");
+    const target = DateTime.fromISO("2026-06-01");
+    const archivedDate = DateTime.fromISO("2026-04-01");
+    const coldDate = DateTime.fromISO("2026-05-01");
+
+    it("prefers the project's actual resolution date over a target it still happens to have", async () => {
+        const { resolveProjectEnd } = await loadAreaProjectsUtils();
+        // A target set when the project started, left in frontmatter after
+        // it was later marked done — the bar should end where it actually
+        // finished, not where it was originally aimed at.
+        expect(resolveProjectEnd({ bucket: "done", target, doneDate, archivedDate, coldDate })).toBe(doneDate);
+        expect(resolveProjectEnd({ bucket: "archived", target, doneDate, archivedDate, coldDate })).toBe(archivedDate);
+        expect(resolveProjectEnd({ bucket: "coldtask", target, doneDate, archivedDate, coldDate })).toBe(coldDate);
+    });
+
+    it("falls back to target when the resolved bucket has no date of its own", async () => {
+        const { resolveProjectEnd } = await loadAreaProjectsUtils();
+        expect(resolveProjectEnd({ bucket: "done", target, doneDate: null })).toBe(target);
+        expect(resolveProjectEnd({ bucket: "archived", target, archivedDate: null })).toBe(target);
+        expect(resolveProjectEnd({ bucket: "coldtask", target, coldDate: null })).toBe(target);
+    });
+
+    it("uses target for active/backlog projects, which have no resolution date at all", async () => {
+        const { resolveProjectEnd } = await loadAreaProjectsUtils();
+        expect(resolveProjectEnd({ bucket: "active", target, doneDate, archivedDate, coldDate })).toBe(target);
+        expect(resolveProjectEnd({ bucket: "backlog", target: null })).toBeNull();
+    });
+});
+
 describe("barGeometry (datacore/utils/areaProjects.js)", () => {
     const windowStart = DateTime.fromISO("2026-01-01");
     const windowEnd = DateTime.fromISO("2026-01-31");

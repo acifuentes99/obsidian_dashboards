@@ -17,7 +17,7 @@
 //       return <AreaProjects />;   // pass area={someFile} to target another note
 //   }
 
-const { STATUS_BUCKETS, BUCKET_COLOR, categorizeProject, matchesArea, daysUntilTarget, formatDaysUntil } =
+const { STATUS_BUCKETS, BUCKET_COLOR, categorizeProject, matchesArea, daysUntilTarget, formatDaysUntil, resolveProjectEnd } =
     await dc.require("Z. Meta/datacore/utils/areaProjects.js");
 // `timestamp` frontmatter is inconsistently typed across the vault (ISO vs.
 // a bare YYYYMMDDHHmm integer, see docs/dashboards/note-tags-creation-timeline.md)
@@ -67,14 +67,15 @@ return function AreaProjects({ area: areaProp } = {}) {
                 const target = dc.coerce.date(p.$frontmatter?.target?.value);
                 const daysUntil = daysUntilTarget(p.$frontmatter?.target?.value);
                 const created = getTimestamp(dc, p);
-                // The timeline's bar end: whichever resolved date applies —
-                // `target` for anything still open, else whenever the project
-                // actually finished/stopped. `null` (none set) means "still
-                // open", which areaProjectsTimeline.jsx draws through to today.
+                // The timeline's bar end: the project's *actual* resolution
+                // date once it has one (done/archived/coldtask), falling
+                // back to `target` only for a still-open project. `null`
+                // (none set) means "still open", which
+                // areaProjectsTimeline.jsx draws through to today.
                 const doneDate = dc.coerce.date(p.$frontmatter?.doneDate?.value);
                 const archivedDate = dc.coerce.date(p.$frontmatter?.archivedDate?.value);
                 const coldDate = dc.coerce.date(p.$frontmatter?.coldDate?.value);
-                const end = target ?? doneDate ?? archivedDate ?? coldDate ?? null;
+                const end = resolveProjectEnd({ bucket, target, doneDate, archivedDate, coldDate });
                 return { link: p.$link, path: p.$path, name: p.$name ?? p.$path, bucket, daysUntil, created, end };
             }),
         [areaFile?.$path]

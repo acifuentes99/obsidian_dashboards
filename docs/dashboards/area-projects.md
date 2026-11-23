@@ -75,13 +75,27 @@ A second, separate presentational component, `datacore/areaProjectsTimeline.jsx`
 (`dc.require`d and rendered by `areaProjects.jsx` itself, fed the same
 `projects` array the badges/table already computed — no second query),
 renders one horizontal bar per dated project: start = `created`, end =
-whichever of `target`/`doneDate`/`archivedDate`/`coldDate` is set, or, if
-none are, `null` — drawn as an "ongoing" bar (faded, titled "Ongoing, no
-target set") running through to today instead of stopping at a fixed point.
+whichever resolved date applies, or `null` (still open) — drawn as a faded
+"ongoing" bar running through to today instead of stopping at a fixed point.
 Shows **every** matching project regardless of status, independent of the
 table's "Show done/archived" toggle, since the point here is the area's
 whole history, not just what's still active.
 
+- **End date — bucket-aware, not just "whichever is set"**:
+  `resolveProjectEnd` in `utils/areaProjects.js` picks the project's
+  *actual* resolution date for a resolved bucket — `doneDate` for `done`,
+  `archivedDate` for `archived`, `coldDate` for `coldtask` — falling back to
+  `target` only if that bucket's own date isn't set. Only `active`/`backlog`
+  (no resolution date at all) use `target` directly. This matters because a
+  project can have both: a `target` set when it started, still sitting in
+  frontmatter after it was later marked done. Using `target ?? doneDate ?? …`
+  (the first, wrong version of this) would draw the bar to the *planned*
+  date instead of when the project *actually* finished.
+- **Hover tooltip**: hovering a bar shows its creation date and the
+  resolved end, labeled by what it actually is (`Target` for an open
+  project, `Done`/`Archived`/`Paused` for a resolved one) rather than a
+  generic "end" — `end` alone doesn't say which field it came from, so the
+  tooltip's label comes from the row's `bucket` instead.
 - **Window + scrolling**: a row of range-preset buttons (reusing a curated
   subset of `timeline.js`'s own `RANGE_PRESETS` ids — `90d`/`180d`/`365d`/
   `730d`/`all` — rather than forking a second preset list, since
@@ -150,10 +164,13 @@ note to backfill.
 - `test/datacore/area-projects-utils.test.js` — `categorizeProject`'s
   priority/exclusivity (including the inconsistent-frontmatter case),
   `matchesArea` against every frontmatter shape above,
-  `daysUntilTarget`/`formatDaysUntil` across future/past/today/missing, and
-  the timeline's `barGeometry`/`todayMarkerPct`/`resolveTimelineWindow`
-  (containment, left/right clamping, open-ended bars stopping at "now" not
-  the window edge, and `all`'s future-reaching span).
+  `daysUntilTarget`/`formatDaysUntil` across future/past/today/missing,
+  `resolveProjectEnd` (a resolved bucket's own date beating a `target` it
+  still has set, each bucket falling back to `target` when it has no date
+  of its own, and active/backlog always using `target`), and the timeline's
+  `barGeometry`/`todayMarkerPct`/`resolveTimelineWindow` (containment,
+  left/right clamping, open-ended bars stopping at "now" not the window
+  edge, and `all`'s future-reaching span).
 - `test/datacore/area-projects.test.js` — filtering to only the current
   area's projects, the five count badges, the done/archived toggle, target-
   date sort order (including the `Infinity`-key regression above), overdue
@@ -162,4 +179,5 @@ note to backfill.
 - `test/datacore/area-projects-timeline.test.js` — chronological row order,
   the skipped-rows count, the today marker appearing/disappearing as the
   window pans, range-preset switching, panning disabled on `all`, the
-  clamped-bar arrows, and the open-ended-bar marker.
+  clamped-bar arrows, the open-ended-bar marker, and the hover tooltip's
+  creation date + bucket-labeled resolved end.

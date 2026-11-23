@@ -74,6 +74,18 @@ function formatDaysUntil(days) {
     return `in ${days}d`;
 }
 
+// The timeline bar's end date — bucket-aware, since a resolved project's
+// *actual* end date should win over a `target` it also happens to still
+// have set (e.g. set when the project started, left in frontmatter after
+// it was later marked done). Only active/backlog projects — which have no
+// resolution date at all — fall back to `target`, if any.
+function resolveProjectEnd({ bucket, target, doneDate, archivedDate, coldDate }) {
+    if (bucket === "done") return doneDate ?? target ?? null;
+    if (bucket === "archived") return archivedDate ?? target ?? null;
+    if (bucket === "coldtask") return coldDate ?? target ?? null;
+    return target ?? null;
+}
+
 // Shared by areaProjects.jsx's badges and areaProjectsTimeline.jsx's bars —
 // reuses 5 of creationTimeline.jsx's 8 dataviz-skill-validated categorical
 // slots (see that file and docs/dashboards/note-tags-creation-timeline.md
@@ -174,6 +186,7 @@ return {
     matchesArea,
     daysUntilTarget,
     formatDaysUntil,
+    resolveProjectEnd,
     TIMELINE_RANGE_PRESETS,
     resolveTimelineWindow,
     barGeometry,

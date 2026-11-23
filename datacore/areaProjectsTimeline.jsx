@@ -39,6 +39,19 @@ function colorFor(isDarkTheme, bucketId) {
     return isDarkTheme ? slot.dark : slot.light;
 }
 
+// Hover text for a row's bar: creation date plus whichever resolved date its
+// `end` actually is — labeled by bucket (`end` itself doesn't say whether it
+// came from `target`, `doneDate`, `archivedDate` or `coldDate`; see
+// resolveProjectEnd in utils/areaProjects.js) rather than a generic "End".
+const RESOLVED_LABEL = { done: "Done", archived: "Archived", coldtask: "Paused" };
+
+function tooltipFor(r) {
+    const createdStr = r.created ? r.created.toFormat("LLL dd yyyy") : "—";
+    if (r.end == null) return `Created ${createdStr} · ongoing, no target set`;
+    const label = RESOLVED_LABEL[r.bucket] ?? "Target";
+    return `Created ${createdStr} · ${label} ${r.end.toFormat("LLL dd yyyy")}`;
+}
+
 return function AreaProjectsTimeline({ rows = [] }) {
     const isDarkTheme = typeof document !== "undefined" && document.body.classList.contains("theme-dark");
     const [rangeId, setRangeId] = dc.useState("365d");
@@ -104,7 +117,7 @@ return function AreaProjectsTimeline({ rows = [] }) {
                                             background: colorFor(isDarkTheme, r.bucket),
                                             opacity: geom.openEnded ? 0.7 : 1,
                                         }}
-                                        title={geom.openEnded ? "Ongoing, no target set" : undefined}
+                                        title={tooltipFor(r)}
                                     />
                                 )}
                             </div>

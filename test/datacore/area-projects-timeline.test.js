@@ -115,6 +115,22 @@ describe("AreaProjectsTimeline component (datacore/areaProjectsTimeline.jsx)", (
         ];
         const { container } = render(h(AreaProjectsTimeline, { rows }));
 
-        expect(container.querySelector('[title="Ongoing, no target set"]')).toBeTruthy();
+        expect(container.querySelector('[title*="ongoing, no target set"]')).toBeTruthy();
+    });
+
+    it("hovering a bar shows the creation date and the resolved end, labeled by bucket", async () => {
+        const now = DateTime.now();
+        const AreaProjectsTimeline = await loadAreaProjectsTimeline();
+        const created = now.minus({ days: 30 });
+        const end = now.minus({ days: 5 });
+        const rows = [
+            row({ name: "Active Proj", bucket: "active", created, end }), // target, since still open
+            row({ name: "Done Proj", bucket: "done", created, end }),
+        ];
+        const { container } = render(h(AreaProjectsTimeline, { rows }));
+
+        const expectedDates = `Created ${created.toFormat("LLL dd yyyy")}`;
+        expect(container.querySelector(`[title^="${expectedDates}"][title*="Target ${end.toFormat("LLL dd yyyy")}"]`)).toBeTruthy();
+        expect(container.querySelector(`[title^="${expectedDates}"][title*="Done ${end.toFormat("LLL dd yyyy")}"]`)).toBeTruthy();
     });
 });
