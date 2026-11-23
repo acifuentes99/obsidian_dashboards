@@ -3,9 +3,19 @@
 // `target` frontmatter date (soonest first) with a "days until target"
 // column. See docs/dashboards/area-projects.md.
 //
+// Paste the whole block below into an Area note (or let
+// insert-area-projects-dashboard.js do it) — datacorejsx blocks must
+// `return` a component, so a bare `<AreaProjects />` expression with no
+// `return` silently renders nothing. Worse, don't end a block with a
+// same-line trailing `//` comment: Datacore appends its own closing syntax
+// right after your code with no newline in between, so a trailing comment
+// swallows it too, producing a "Unexpected end of input" SyntaxError
+// instead of just rendering nothing.
+//
 //   const AreaProjects = await dc.require("Z. Meta/datacore/areaProjects.jsx");
-//   <AreaProjects />                  // current note is the Area note
-//   <AreaProjects area={someFile} />  // explicit Area note (e.g. testing)
+//   return function View() {
+//       return <AreaProjects />;   // pass area={someFile} to target another note
+//   }
 
 const { STATUS_BUCKETS, categorizeProject, matchesArea, daysUntilTarget, formatDaysUntil } =
     await dc.require("Z. Meta/datacore/utils/areaProjects.js");

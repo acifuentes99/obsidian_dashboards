@@ -60,6 +60,22 @@ Only `active`/`backlog`/`coldtask` projects show in the table by default —
 `done`/`archived` ones are typically no longer working toward their target —
 behind a "Show done/archived" toggle.
 
+## Gotcha: a trailing comment can swallow the block's closing syntax
+
+Hit on first real-world use: the header comment above originally showed the
+bare-usage shorthand (`<AreaProjects />  // current note is the Area note`,
+no `return` wrapper) as a one-line illustration of the props, not as a
+pasteable block. Someone copied it in verbatim anyway, and it failed with
+`SyntaxError: Unexpected end of input` rather than just rendering nothing.
+Why a *syntax* error: Datacore evaluates a block by wrapping its source in
+something like `(async () => { <your code> })()`, appending its own closing
+syntax immediately after your code with no newline in between. A same-line
+trailing `//` comment as the last thing in the block comments out that
+appended closing syntax too, leaving the wrapper function unterminated.
+Fixed by rewriting the header comment to show the full, correct,
+copy-pasteable block (with the required `return function View() {...}`
+wrapper) instead of the shorthand — see `datacore/areaProjects.jsx`.
+
 ## Adding this to an Area note
 
 Area notes aren't part of this repo (they live in the vault's `A. PARA
