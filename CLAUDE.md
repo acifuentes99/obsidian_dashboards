@@ -58,7 +58,10 @@ macro) to react when a note's frontmatter property changes — e.g.
 `status-date-sync.js` stamps `doneDate`/`coldDate`/`archivedDate` on
 `type/project` notes when `status` flips to `done`/`coldtask`/`archive`.
 `status-date-backfill.js` is a one-off QuickAdd command (not a trigger) that
-applies the same stamping retroactively to existing notes. No Templater
+applies the same stamping retroactively to existing notes.
+`insert-area-projects-dashboard.js` is another one-off command: it appends
+the Area dashboard's "Projects" section (`datacore/areaProjects.jsx`, see
+`docs/dashboards/area-projects.md`) to the active Area note. No Templater
 scripts exist in this repo yet.
 
 Same workflow as Datacore: edit the `.js` file here, `npm run sync` to copy
