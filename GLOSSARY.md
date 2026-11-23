@@ -23,3 +23,16 @@ The grouping of root resources by their `category` frontmatter value, used
 to section the resource tree (e.g. "Books", "Otros" for resources with no
 category set). Only root resources are grouped — sub-resources are rendered
 nested under their parent, not listed separately in a category group.
+
+## Project status bucket
+
+The single status an Area dashboard's "Projects" section
+(`datacore/areaProjects.jsx`) sorts a project into — `active`, `coldtask`,
+`backlog`, `archived`, or `done` — computed by
+`datacore/utils/areaProjects.js`'s `categorizeProject`. Priority-ordered and
+mutually exclusive (`done` beats `archived` beats `coldtask` beats
+`backlog`), so a project with inconsistent frontmatter (e.g. an `#archive`
+tag while `status: coldtask`) still lands in exactly one bucket. Distinct
+from — and not yet shared with — Projects.md's own inline categorization,
+which doesn't guarantee that exclusivity; see
+`docs/dashboards/area-projects.md`.

@@ -1,0 +1,108 @@
+// Area dashboard "Projects" section: every project whose `area` frontmatter
+// points at this Area note, a status-count badge row, and a table sorted by
+// `target` frontmatter date (soonest first) with a "days until target"
+// column. See docs/dashboards/area-projects.md.
+//
+//   const AreaProjects = await dc.require("Z. Meta/datacore/areaProjects.jsx");
+//   <AreaProjects />                  // current note is the Area note
+//   <AreaProjects area={someFile} />  // explicit Area note (e.g. testing)
+
+const { STATUS_BUCKETS, categorizeProject, matchesArea, daysUntilTarget, formatDaysUntil } =
+    await dc.require("Z. Meta/datacore/utils/areaProjects.js");
+
+// Reuses 5 of creationTimeline.jsx's 8 dataviz-skill-validated categorical
+// slots (see that file and docs/dashboards/note-tags-creation-timeline.md
+// for the palette's source/validation) rather than re-deriving new hues —
+// same light/dark pairs, picked for a sensible status association (blue
+// "in progress", green "done", red "archived"/closed).
+const BUCKET_COLOR = {
+    active: { light: "#2a78d6", dark: "#3987e5" },
+    backlog: { light: "#eda100", dark: "#c98500" },
+    coldtask: { light: "#4a3aa7", dark: "#9085e9" },
+    archived: { light: "#e34948", dark: "#e66767" },
+    done: { light: "#1baf7a", dark: "#199e70" },
+};
+
+const BUCKET_LABEL = Object.fromEntries(STATUS_BUCKETS.map((b) => [b.id, b.label]));
+
+const S = {
+    stats: { display: "flex", flexWrap: "wrap", gap: "0.5rem", margin: "0.5rem 0" },
+    badge: { padding: "0.15rem 0.6rem", borderRadius: "999px", fontSize: "0.8rem", color: "#fff", whiteSpace: "nowrap" },
+    nowrap: { whiteSpace: "nowrap" },
+    btn: { fontSize: "0.8rem", padding: "0.2rem 0.6rem", borderRadius: "4px", cursor: "pointer", border: "1px solid var(--background-modifier-border)", background: "var(--background-secondary)", color: "var(--text-normal)", marginTop: "0.5rem" },
+};
+
+function targetStyle(days) {
+    if (days == null) return { ...S.nowrap, color: "var(--text-muted)" };
+    if (days < 0) return { ...S.nowrap, color: "var(--color-red)", fontWeight: 600 };
+    if (days <= 7) return { ...S.nowrap, color: "var(--color-orange)" };
+    return S.nowrap;
+}
+
+return function AreaProjects({ area: areaProp } = {}) {
+    const isDarkTheme = typeof document !== "undefined" && document.body.classList.contains("theme-dark");
+    const colorFor = (bucketId) => {
+        const slot = BUCKET_COLOR[bucketId];
+        return isDarkTheme ? slot.dark : slot.light;
+    };
+
+    const currentFile = dc.useCurrentFile({ debounce: 10000 });
+    const areaFile = areaProp ?? currentFile;
+    const [showResolved, setShowResolved] = dc.useState(false);
+
+    const allProjects = dc.useQuery("@page and #type/project", { debounce: 2500 });
+
+    const projects = dc.useArray(allProjects, (arr) =>
+        arr
+            .filter((p) => matchesArea(p.$frontmatter?.area?.value, areaFile))
+            .map((p) => {
+                const status = p.$frontmatter?.status?.value;
+                const tags = p.$tags ?? [];
+                const bucket = categorizeProject({ status, tags });
+                const daysUntil = daysUntilTarget(p.$frontmatter?.target?.value);
+                return { link: p.$link, path: p.$path, name: p.$name ?? p.$path, bucket, daysUntil };
+            }),
+        [areaFile?.$path]
+    );
+
+    const counts = dc.useMemo(() => {
+        const c = Object.fromEntries(STATUS_BUCKETS.map((b) => [b.id, 0]));
+        projects.forEach((p) => { c[p.bucket] = (c[p.bucket] ?? 0) + 1; });
+        return c;
+    }, [projects]);
+
+    // `projects` is a DataArray (see dc.useArray above), whose `.sort()` takes
+    // a key function + "asc"/"desc" (DataArray's own API — not a native
+    // comparator; see Projects.md for the same convention). `?? Infinity`
+    // pushes no-target projects to the end regardless of direction.
+    const rows = dc.useMemo(
+        () => projects
+            .filter((p) => showResolved || (p.bucket !== "done" && p.bucket !== "archived"))
+            .sort((p) => p.daysUntil ?? Infinity, "asc"),
+        [projects, showResolved]
+    );
+
+    const COLUMNS = [
+        { id: "Project", value: (r) => r.link },
+        { id: "Status", value: (r) => BUCKET_LABEL[r.bucket], render: (v) => <span style={S.nowrap}>{v}</span> },
+        { id: "Target", value: (r) => formatDaysUntil(r.daysUntil), render: (v, r) => <span style={targetStyle(r.daysUntil)}>{v}</span> },
+    ];
+
+    return (
+        <div>
+            <div style={S.stats}>
+                {STATUS_BUCKETS.map((b) => (
+                    <span key={b.id} style={{ ...S.badge, background: colorFor(b.id) }}>
+                        {b.label}: {counts[b.id] ?? 0}
+                    </span>
+                ))}
+            </div>
+            {rows.length === 0
+                ? <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>No related projects.</p>
+                : <dc.Table class="no-hover" rows={rows} columns={COLUMNS} paging={20} />}
+            <button style={S.btn} onClick={() => setShowResolved((v) => !v)}>
+                {showResolved ? "Hide done/archived" : "Show done/archived"}
+            </button>
+        </div>
+    );
+};
