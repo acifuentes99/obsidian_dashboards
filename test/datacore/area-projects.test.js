@@ -29,13 +29,21 @@ async function loadAreaProjects(pages) {
 
 const AREA_FILE = { $path: "A. PARA Notes/Areas/Obsidian Dashboards Area Note.md", $name: "Obsidian Dashboards Area Note" };
 
-function project({ name, status, tags = [], target, area = "[[Obsidian Dashboards Area Note]]" }) {
+function project({ name, status, tags = [], target, timestamp, area = "[[Obsidian Dashboards Area Note]]" }) {
+    const frontmatter = { status: { value: status }, area: { value: area }, target: { value: target } };
+    // Only set when given, matching a real page's $frontmatter (no entry at
+    // all for a field the note's frontmatter doesn't have) — commons.js's
+    // getTimestamp distinguishes "no timestamp key" (returns null) from "a
+    // timestamp key with an uncoercible value" (throws), so wrapping a
+    // never-provided timestamp in a `{ value: undefined }` entry here would
+    // hit the latter by mistake.
+    if (timestamp !== undefined) frontmatter.timestamp = { value: timestamp };
     return {
         $link: name,
         $path: `A. PARA Notes/Projects/${name}.md`,
         $name: name,
         $tags: tags,
-        $frontmatter: { status: { value: status }, area: { value: area }, target: { value: target } },
+        $frontmatter: frontmatter,
     };
 }
 
@@ -113,6 +121,24 @@ describe("AreaProjects component (datacore/areaProjects.jsx)", () => {
 
         expect(getByText("5d overdue")).toBeTruthy();
         expect(getByText("in 5d")).toBeTruthy();
+    });
+
+    it("shows the project's creation date, or an em dash when it has none, and handles the bare-integer timestamp format", async () => {
+        // Datacore-recognized date frontmatter arrives as an actual Luxon
+        // DateTime (see note-tags-dashboard.test.js's makePage for the same
+        // convention) — commons.js's getTimestamp only re-parses a raw
+        // string/number itself for the legacy bare-integer format below.
+        const AreaProjects = await loadAreaProjects([
+            project({ name: "ISO Date", status: "active", timestamp: DateTime.fromISO("2026-01-05") }),
+            project({ name: "Integer Date", status: "active", timestamp: 202601060930 }),
+            project({ name: "No Date", status: "active" }),
+        ]);
+
+        const { getByText, getAllByText } = render(h(AreaProjects, { area: AREA_FILE }));
+
+        expect(getByText("Jan 05 2026")).toBeTruthy();
+        expect(getByText("Jan 06 2026")).toBeTruthy();
+        expect(getAllByText("—").length).toBeGreaterThan(0);
     });
 
     it("falls back to the current note when no area prop is passed", async () => {

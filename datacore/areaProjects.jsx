@@ -19,6 +19,11 @@
 
 const { STATUS_BUCKETS, categorizeProject, matchesArea, daysUntilTarget, formatDaysUntil } =
     await dc.require("Z. Meta/datacore/utils/areaProjects.js");
+// `timestamp` frontmatter is inconsistently typed across the vault (ISO vs.
+// a bare YYYYMMDDHHmm integer, see docs/dashboards/note-tags-creation-timeline.md)
+// — reuse commons.js's existing coercion rather than a 4th copy of it
+// (Projects.md, the Note/Tags dashboard, and commons.js itself already have one).
+const { getTimestamp } = await dc.require("Z. Meta/datacore/utils/commons.js");
 
 // Reuses 5 of creationTimeline.jsx's 8 dataviz-skill-validated categorical
 // slots (see that file and docs/dashboards/note-tags-creation-timeline.md
@@ -49,6 +54,8 @@ function targetStyle(days) {
     return S.nowrap;
 }
 
+const fmtDate = (ts) => (ts ? ts.toFormat("LLL dd yyyy") : "—");
+
 return function AreaProjects({ area: areaProp } = {}) {
     const isDarkTheme = typeof document !== "undefined" && document.body.classList.contains("theme-dark");
     const colorFor = (bucketId) => {
@@ -70,7 +77,8 @@ return function AreaProjects({ area: areaProp } = {}) {
                 const tags = p.$tags ?? [];
                 const bucket = categorizeProject({ status, tags });
                 const daysUntil = daysUntilTarget(p.$frontmatter?.target?.value);
-                return { link: p.$link, path: p.$path, name: p.$name ?? p.$path, bucket, daysUntil };
+                const created = getTimestamp(dc, p);
+                return { link: p.$link, path: p.$path, name: p.$name ?? p.$path, bucket, daysUntil, created };
             }),
         [areaFile?.$path]
     );
@@ -95,6 +103,7 @@ return function AreaProjects({ area: areaProp } = {}) {
     const COLUMNS = [
         { id: "Project", value: (r) => r.link },
         { id: "Status", value: (r) => BUCKET_LABEL[r.bucket], render: (v) => <span style={S.nowrap}>{v}</span> },
+        { id: "Created", value: (r) => fmtDate(r.created), render: (v) => <span style={S.nowrap}>{v}</span> },
         { id: "Target", value: (r) => formatDaysUntil(r.daysUntil), render: (v, r) => <span style={targetStyle(r.daysUntil)}>{v}</span> },
     ];
 

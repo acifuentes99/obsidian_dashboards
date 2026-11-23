@@ -60,6 +60,15 @@ Only `active`/`backlog`/`coldtask` projects show in the table by default —
 `done`/`archived` ones are typically no longer working toward their target —
 behind a "Show done/archived" toggle.
 
+## Created column
+
+Reuses `commons.js`'s `getTimestamp(dc, row)` for the `timestamp` frontmatter
+field — not a 4th copy of it (Projects.md, the Note/Tags dashboard, and
+commons.js itself already each have one) — since project notes share the
+same vault-wide inconsistency (ISO datetime vs. a bare `YYYYMMDDHHmm`
+integer; see `docs/dashboards/note-tags-creation-timeline.md`) that function
+already coerces. Shown as-is, doesn't affect the table's sort order.
+
 ## Gotcha: a trailing comment can swallow the block's closing syntax
 
 Hit on first real-world use: the header comment above originally showed the
